@@ -1,0 +1,76 @@
+#!/bin/bash
+
+#set up ftp server
+#
+#version v0.1  2015/12/2    lr75106
+if rpm -qa | grep vsftpd
+then
+    echo vsftpd had been installed
+else
+    yum install vsftpd -y
+fi
+rm -f /etc/pam.d/vsftpd
+def()
+{
+	cp vsftpd.conf /etc/vsftpd/
+	cp vsftpd /etc/pam.d/
+	cp test /etc/vsftpd/vuser_conf/
+	cp vuser_passwd.txt /etc/vsftpd/
+}
+
+add_vsftpd()
+{
+	echo auth required pam_userdb.so db=/etc/vsftpd/vuser_passwd >>/etc/pam.d/vsftpd
+	echo account required pam_userdb.so db=/etc/vsftpd/vuser_passwd >>/etc/pam.d/vsftpd
+}
+
+add_conf()
+{
+	echo pam_service_name=vsftpd >>/etc/vsftpd/vsftpd.conf
+	echo userlist_enable=YES >>/etc/vsftpd/vsftpd.conf
+	echo tcp_wrappers=YES >>/etc/vsftpd/vsftpd.conf
+	echo anonymous_enable=NO >>/etc/vsftpd/vsftpd.conf
+	echo local_enable=YES >>/etc/vsftpd/vsftpd.conf
+	echo chroot_list_enable=YES >>/etc/vsftpd/vsftpd.conf
+	echo ascii_upload_enable=YES >>/etc/vsftpd/vsftpd.conf
+	echo ascii_download_enable=YES >>/etc/vsftpd/vsftpd.conf
+	echo pam_service_name=vsftpd >>/etc/vsftpd/vsftpd.conf
+	
+	echo guest_enable=YES >>/etc/vsftpd/vsftpd.conf
+	echo guest_username=ftp >>/etc/vsftpd/vsftpd.conf
+	echo user_config_dir=/etc/vsftpd/vuser_conf >>/etc/vsftpd/vsftpd.conf
+	echo chroot_list_file=/etc/vsftpd/vuser_passwd.txt >>/etc/vsftpd/vsftpd.conf
+}
+
+add_test()
+{
+	echo local_root=/ftp/updata >>/etc/vsftpd/vuser_conf/test
+	echo write_enable=YES >>/etc/vsftpd/vuser_conf/test
+	echo anon_umask=022 >>/etc/vsftpd/vuser_conf/test
+	echo anon_world_readable_only=NO >>/etc/vsftpd/vuser_conf/test
+	echo anon_upload_enable=YES >>/etc/vsftpd/vuser_conf/test
+	echo anon_mkdir_write_enable=YES >>/etc/vsftpd/vuser_conf/test
+	echo anon_other_write_enable=YES >>/etc/vsftpd/vuser_conf/test
+}
+
+add_vuser()
+{
+	echo test >>/etc/vsftpd/vuser_passwd.txt
+	echo 123456 >>/etc/vsftpd/vuser_passwd.txt
+}
+
+mkdir /etc/vsftpd/vuser_conf
+mkdir /ftp
+mkdir /ftp/updata
+chmod 777 /ftp/updata
+
+add_vsftpd
+add_conf
+add_test
+add_vuser
+
+db_load -T -t hash -f /etc/vsftpd/vuser_passwd.txt /etc/vsftpd/vuser_passwd.db
+setsebool -P allow_ftpd_full_access=1
+setsebool -P ftp_home_dir=1
+service iptables stop
+service vsftpd start

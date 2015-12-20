@@ -3,9 +3,11 @@
 #set up ftp server
 #
 #version v0.1  2015/12/2    lr75106
+flag=0
 if rpm -qa | grep vsftpd
 then
     echo vsftpd had been installed
+    flag=1
 else
     yum install vsftpd -y
 fi
@@ -59,18 +61,46 @@ add_vuser()
 	echo 123456 >>/etc/vsftpd/vuser_passwd.txt
 }
 
-mkdir /etc/vsftpd/vuser_conf
-mkdir /ftp
-mkdir /ftp/updata
-chmod 777 /ftp/updata
+iptab_conf()
+{
+    rm /etc/sysconfig/iptables
+    sed -i '6c IPTABLES_MODULES="ip_conntrack_ftp ip_nat_ftp"' /etc/sysconfig/iptables-config
+    echo *filter >>/etc/sysconfig/iptables
+    echo :INPUT ACCEPT [0:0] >>/etc/sysconfig/iptables
+    echo :FORWARD ACCEPT [0:0] >>/etc/sysconfig/iptables
+    echo :OUTPUT ACCEPT [5:605] >>/etc/sysconfig/iptables
+    echo -A INPUT -p tcp -m tcp --dport 20 -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -p tcp -m tcp --dport 21 -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -p tcp -m tcp --dport 3306 -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -p icmp -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -i lo -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT >>/etc/sysconfig/iptables
+    echo -A INPUT -j REJECT --reject-with icmp-host-prohibited >>/etc/sysconfig/iptables
+    echo -A FORWARD -j REJECT --reject-with icmp-host-prohibited >>/etc/sysconfig/iptables
+    echo COMMIT >>/etc/sysconfig/iptables
+}
 
-add_vsftpd
-add_conf
-add_test
-add_vuser
+if [ $flag -eq 0 ]
+then
+{
+    mkdir /etc/vsftpd/vuser_conf
+    mkdir /ftp
+    mkdir /ftp/updata
+    chmod 777 /ftp/updata
 
-db_load -T -t hash -f /etc/vsftpd/vuser_passwd.txt /etc/vsftpd/vuser_passwd.db
-setsebool -P allow_ftpd_full_access=1
-setsebool -P ftp_home_dir=1
-service iptables stop
-service vsftpd start
+    add_vsftpd
+    add_conf
+    add_test
+    add_vuser
+    iptab_conf
+
+    service iptables start
+    db_load -T -t hash -f /etc/vsftpd/vuser_passwd.txt /etc/vsftpd/vuser_passwd.db
+    setsebool -P allow_ftpd_full_access=1
+    setsebool -P ftp_home_dir=1
+    service iptables restart
+    service vsftpd start
+}
+fi

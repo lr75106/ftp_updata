@@ -1,6 +1,0 @@
-#!/bin/bash
-cp sftp /etc/init.d/&&chmod 777 /etc/init.d/sftp&&\
-update-rc.d sftp defaults 98 >>/dev/null&&\
-mkdir /opt/spice&&cp mftp.x config.ftp /opt/spice&&\
-echo "set_auto_updata sucessful"
-
